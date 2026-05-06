@@ -11,15 +11,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 # --- Configuration ---
-TOKEN = "8655043839:AAE_qIxO1QAORFsSJzpIMybe5a-wWVeDfL4" 
-BOT_USERNAME = "dramastorkingsbot" 
-MONGO_URI = "mongodb+srv://drama:drama@cluster0.sa4kvgu.mongodb.net/DramaStoreDB?retryWrites=true&w=majority&appName=Cluster0"
+TOKEN = "8242077263:AAF5OTBhAfv5TXiXvlYaADCzVjK2FGzT1WE" 
+BOT_USERNAME = "DramaKingBangladeshOfficialbot" 
+MONGO_URI = "mongodb+srv://bdking:bdking@cluster0.2cg0ekx.mongodb.net/?appName=Cluster0"
 BASE_URL = "https://indirect-meris-yeasinvai-95120fc6.koyeb.app" 
 
 # --- New added Security and API Info ---
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
-OWNER_ID = 7120801813 # Your telegram ID here (Only you can add movies)
+OWNER_ID = 2130296341 # Your telegram ID here (Only you can add movies)
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
