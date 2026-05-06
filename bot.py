@@ -14,7 +14,7 @@ from functools import wraps
 TOKEN = "8242077263:AAF5OTBhAfv5TXiXvlYaADCzVjK2FGzT1WE" 
 BOT_USERNAME = "DramaKingBangladeshOfficialbot" 
 MONGO_URI = "mongodb+srv://bdking:bdking@cluster0.2cg0ekx.mongodb.net/?appName=Cluster0"
-BASE_URL = "https://indirect-meris-yeasinvai-95120fc6.koyeb.app" 
+BASE_URL = "https://kdramawatch.vercel.app" 
 
 # --- New added Security and API Info ---
 API_ID = "29904834" 
