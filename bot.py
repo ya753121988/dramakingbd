@@ -13,7 +13,8 @@ from functools import wraps
 # --- Configuration ---
 TOKEN = "8242077263:AAF5OTBhAfv5TXiXvlYaADCzVjK2FGzT1WE" 
 BOT_USERNAME = "DramaKingBangladeshOfficialbot" 
-MONGO_URI = "mongodb+srv://bdking:bdking@cluster0.2cg0ekx.mongodb.net/?appName=Cluster0"
+# এখানে ডাটাবেসের নাম 'kdrama_db' যোগ করা হয়েছে যাতে mongo.db খালি না থাকে
+MONGO_URI = "mongodb+srv://bdking:bdking@cluster0.2cg0ekx.mongodb.net/kdrama_db?retryWrites=true&w=majority&appName=Cluster0"
 BASE_URL = "https://kdramawatch.vercel.app" 
 
 # --- New added Security and API Info ---
