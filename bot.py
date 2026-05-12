@@ -11,7 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 # --- Configuration ---
-TOKEN = "8242077263:AAF5OTBhAfv5TXiXvlYaADCzVjK2FGzT1WE" 
+TOKEN = "8242077263:AAHyICmg24VklsR4-vnwQo_BeF_JoqVapqQ" 
 BOT_USERNAME = "DramaKingBangladeshOfficialbot" 
 # এখানে ডাটাবেসের নাম 'kdrama_db' যোগ করা হয়েছে যাতে mongo.db খালি না থাকে
 MONGO_URI = "mongodb+srv://bdking:bdking@cluster0.2cg0ekx.mongodb.net/kdrama_db?retryWrites=true&w=majority&appName=Cluster0"
