@@ -20,7 +20,7 @@ BASE_URL = "https://kdramawatch.vercel.app"
 # --- New added Security and API Info ---
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
-OWNER_ID = 2130296341 # Your telegram ID here (Only you can add movies)
+OWNER_ID = 2130296341,7120801813 # Your telegram ID here (Only you can add movies)
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
