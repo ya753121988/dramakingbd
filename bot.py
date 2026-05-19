@@ -4,7 +4,6 @@ import logging
 import datetime
 import threading
 import time
-import io
 from flask import Flask, request, redirect, url_for, session, flash, render_template_string, jsonify
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
@@ -21,9 +20,7 @@ BASE_URL = "https://kdramawatch.vercel.app"
 # --- New added Security and API Info ---
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
-
-# এখানে আপনি যত খুশি এডমিন আইডি বসাতে পারবেন (কমা দিয়ে দিয়ে আইডি দিন)
-ADMIN_IDS = [2130296341, 7120801813] 
+OWNER_ID = 2130296341 # Your telegram ID here (Only you can add movies)
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
@@ -1361,41 +1358,14 @@ def handle_bot_start(m):
             
             protect = True if settings.get('protect_content') == "Yes" else False
             
-            # --- অটো থাম্বনেইল ডেলিভারি লজিক (নিশ্চিত উপায়) ---
-            # মেমোরিতে থাম্বনেইল ডাউনলোড করে ইউজারকে পাঠানো হচ্ছে
-            thumb_file = None
-            if movie and movie.get('poster_file_id'):
-                try:
-                    f_info = bot.get_file(movie['poster_file_id'])
-                    d_file = bot.download_file(f_info.file_path)
-                    thumb_file = io.BytesIO(d_file)
-                except: pass
-
-            # মুভি ফাইল ইনফো নেওয়া হচ্ছে যাতে File ID পাওয়া যায়
-            orig_msg = bot.forward_message(m.chat.id, channel_id, msg_id)
-            # ফরোয়ার্ড করা মেসেজ থেকে ফাইল আইডি নেওয়া
-            f_id = None
-            if orig_msg.video: f_id = orig_msg.video.file_id
-            elif orig_msg.document: f_id = orig_msg.document.file_id
-            
-            # ফরোয়ার্ড মেসেজ ডিলিট (ইউজার যাতে মেইন চ্যানেলের আইডি না দেখে)
-            bot.delete_message(m.chat.id, orig_msg.message_id)
-
-            if f_id:
-                if orig_msg.video:
-                    sent_msg = bot.send_video(m.chat.id, f_id, caption=caption, thumb=thumb_file, protect_content=protect)
-                else:
-                    sent_msg = bot.send_document(m.chat.id, f_id, caption=caption, thumb=thumb_file, protect_content=protect)
-            else:
-                # ফলব্যাক হিসেবে সরাসরি কপি মেসেজ
-                sent_msg = bot.copy_message(m.chat.id, channel_id, msg_id, caption=caption, protect_content=protect)
+            sent_msg = bot.copy_message(m.chat.id, channel_id, msg_id, caption=caption, protect_content=protect)
             
             bot.send_message(m.chat.id, f"✅ File provided above.\n⚠️ It will be auto-deleted in {settings.get('auto_delete_time')} minutes.")
             
             threading.Thread(target=delete_msg, args=(m.chat.id, sent_msg.message_id, int(settings.get('auto_delete_time', 5)))).start()
 
         except Exception as e:
-            bot.send_message(m.chat.id, f"❌ Error: {str(e)}")
+            bot.send_message(m.chat.id, "❌ File not found.")
     else:
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("🌐 Visit Website", url=BASE_URL))
@@ -1405,9 +1375,8 @@ def handle_bot_start(m):
 
 @bot.message_handler(commands=['movie'])
 def start_adding_movie(m):
-    # আনলিমিটেড এডমিন আইডি চেক
-    if m.from_user.id not in ADMIN_IDS:
-        bot.send_message(m.chat.id, f"❌ You are not an authorized admin!")
+    if int(m.from_user.id) != int(OWNER_ID):
+        bot.send_message(m.chat.id, f"❌ You are not the owner!")
         return
     try:
         parts = m.text.split('/movie ')[1].split(',')
@@ -1429,8 +1398,7 @@ def start_adding_movie(m):
 def handle_bot_inputs(m):
     cid = m.chat.id
     if cid not in user_states: return
-    # আনলিমিটেড এডমিন আইডি চেক
-    if m.from_user.id not in ADMIN_IDS: return 
+    if int(m.from_user.id) != int(OWNER_ID): return 
     
     state = user_states[cid]
     settings = get_site_settings()
@@ -1481,9 +1449,10 @@ def handle_bot_inputs(m):
                 return
             try:
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
-                
-                # আপনার নির্দেশ অনুযায়ী অ্যাডমিন যখন আপলোড করবে তখন কোনো পরিবর্তন হবে না (কপি মেসেজ হবে)
-                sent = bot.copy_message(storage_ch, cid, m.message_id)
+                if m.content_type == 'video':
+                    sent = bot.send_video(storage_ch, m.video.file_id)
+                else:
+                    sent = bot.send_document(storage_ch, m.document.file_id)
                 
                 user_states[cid]['episodes'].append(sent.message_id)
                 bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added.")
