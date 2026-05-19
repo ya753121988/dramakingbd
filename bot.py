@@ -4,6 +4,7 @@ import logging
 import datetime
 import threading
 import time
+import tempfile
 from flask import Flask, request, redirect, url_for, session, flash, render_template_string, jsonify
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
@@ -1455,25 +1456,26 @@ def handle_bot_inputs(m):
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
                 
                 # --- অটোমেটিক থাম্বনেল এড করার লজিক (Write-Only Error Fix) ---
-                # পোস্টারটি /tmp/ ফোল্ডারে ডাউনলোড করা হচ্ছে যা Vercel-এ অ্যালাউড
+                # সিস্টেমের ডিফল্ট টেম্পোরারি ফোল্ডার ব্যবহার করা হচ্ছে
                 thumb_file_id = state.get('poster_file_id')
                 file_info = bot.get_file(thumb_file_id)
                 downloaded_thumb = bot.download_file(file_info.file_path)
                 
-                temp_thumb_name = f"/tmp/thumb_{cid}.jpg" # এখানে /tmp/ ব্যবহার করা হয়েছে
-                with open(temp_thumb_name, 'wb') as f:
-                    f.write(downloaded_thumb)
+                # tempfile মডিউল ব্যবহার করে নিরাপদ টেম্পোরারি পাথ তৈরি
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+                    tmp_file.write(downloaded_thumb)
+                    temp_thumb_path = tmp_file.name
                 
                 # নতুন থাম্বনেল সহ ভিডিওটি স্টোরেজ চ্যানেলে পাঠানো হচ্ছে
-                with open(temp_thumb_name, 'rb') as thumb_file:
+                with open(temp_thumb_path, 'rb') as thumb_file:
                     if m.content_type == 'video':
                         sent = bot.send_video(storage_ch, m.video.file_id, thumb=thumb_file)
                     else:
                         sent = bot.send_document(storage_ch, m.document.file_id, thumb=thumb_file)
                 
-                # সাময়িক ফাইল ডিলিট
+                # পাঠানোর পর ফাইলটি মুছে ফেলুন
                 try:
-                    os.remove(temp_thumb_name)
+                    os.remove(temp_thumb_path)
                 except:
                     pass
                 
