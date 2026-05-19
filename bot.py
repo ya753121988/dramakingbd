@@ -4,7 +4,7 @@ import logging
 import datetime
 import threading
 import time
-import tempfile
+import io
 from flask import Flask, request, redirect, url_for, session, flash, render_template_string, jsonify
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
@@ -22,7 +22,7 @@ BASE_URL = "https://kdramawatch.vercel.app"
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
 
-# এখানে আনলিমিটেড এডমিন আইডি বসানো যায় (কমা দিয়ে দিয়ে আইডি দিন)
+# এখানে আপনি যত খুশি এডমিন আইডি বসাতে পারবেন (কমা দিয়ে দিয়ে আইডি দিন)
 ADMIN_IDS = [2130296341, 7120801813] 
 
 app = Flask(__name__)
@@ -1361,14 +1361,41 @@ def handle_bot_start(m):
             
             protect = True if settings.get('protect_content') == "Yes" else False
             
-            sent_msg = bot.copy_message(m.chat.id, channel_id, msg_id, caption=caption, protect_content=protect)
+            # --- অটো থাম্বনেইল ডেলিভারি লজিক (নিশ্চিত উপায়) ---
+            # মেমোরিতে থাম্বনেইল ডাউনলোড করে ইউজারকে পাঠানো হচ্ছে
+            thumb_file = None
+            if movie and movie.get('poster_file_id'):
+                try:
+                    f_info = bot.get_file(movie['poster_file_id'])
+                    d_file = bot.download_file(f_info.file_path)
+                    thumb_file = io.BytesIO(d_file)
+                except: pass
+
+            # মুভি ফাইল ইনফো নেওয়া হচ্ছে যাতে File ID পাওয়া যায়
+            orig_msg = bot.forward_message(m.chat.id, channel_id, msg_id)
+            # ফরোয়ার্ড করা মেসেজ থেকে ফাইল আইডি নেওয়া
+            f_id = None
+            if orig_msg.video: f_id = orig_msg.video.file_id
+            elif orig_msg.document: f_id = orig_msg.document.file_id
+            
+            # ফরোয়ার্ড মেসেজ ডিলিট (ইউজার যাতে মেইন চ্যানেলের আইডি না দেখে)
+            bot.delete_message(m.chat.id, orig_msg.message_id)
+
+            if f_id:
+                if orig_msg.video:
+                    sent_msg = bot.send_video(m.chat.id, f_id, caption=caption, thumb=thumb_file, protect_content=protect)
+                else:
+                    sent_msg = bot.send_document(m.chat.id, f_id, caption=caption, thumb=thumb_file, protect_content=protect)
+            else:
+                # ফলব্যাক হিসেবে সরাসরি কপি মেসেজ
+                sent_msg = bot.copy_message(m.chat.id, channel_id, msg_id, caption=caption, protect_content=protect)
             
             bot.send_message(m.chat.id, f"✅ File provided above.\n⚠️ It will be auto-deleted in {settings.get('auto_delete_time')} minutes.")
             
             threading.Thread(target=delete_msg, args=(m.chat.id, sent_msg.message_id, int(settings.get('auto_delete_time', 5)))).start()
 
         except Exception as e:
-            bot.send_message(m.chat.id, "❌ File not found.")
+            bot.send_message(m.chat.id, f"❌ Error: {str(e)}")
     else:
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("🌐 Visit Website", url=BASE_URL))
@@ -1455,32 +1482,11 @@ def handle_bot_inputs(m):
             try:
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
                 
-                # --- অটোমেটিক থাম্বনেল এড করার লজিক (Write-Only Error Fix) ---
-                # সিস্টেমের ডিফল্ট টেম্পোরারি ফোল্ডার ব্যবহার করা হচ্ছে
-                thumb_file_id = state.get('poster_file_id')
-                file_info = bot.get_file(thumb_file_id)
-                downloaded_thumb = bot.download_file(file_info.file_path)
-                
-                # tempfile মডিউল ব্যবহার করে নিরাপদ টেম্পোরারি পাথ তৈরি
-                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
-                    tmp_file.write(downloaded_thumb)
-                    temp_thumb_path = tmp_file.name
-                
-                # নতুন থাম্বনেল সহ ভিডিওটি স্টোরেজ চ্যানেলে পাঠানো হচ্ছে
-                with open(temp_thumb_path, 'rb') as thumb_file:
-                    if m.content_type == 'video':
-                        sent = bot.send_video(storage_ch, m.video.file_id, thumb=thumb_file)
-                    else:
-                        sent = bot.send_document(storage_ch, m.document.file_id, thumb=thumb_file)
-                
-                # পাঠানোর পর ফাইলটি মুছে ফেলুন
-                try:
-                    os.remove(temp_thumb_path)
-                except:
-                    pass
+                # আপনার নির্দেশ অনুযায়ী অ্যাডমিন যখন আপলোড করবে তখন কোনো পরিবর্তন হবে না (কপি মেসেজ হবে)
+                sent = bot.copy_message(storage_ch, cid, m.message_id)
                 
                 user_states[cid]['episodes'].append(sent.message_id)
-                bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added with Thumbnail.")
+                bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added.")
             except Exception as e:
                 bot.send_message(cid, f"❌ Error: {str(e)}")
 
