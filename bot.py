@@ -379,6 +379,7 @@ FULL_CSS = """
         border: 1px solid #333;
     }
     .del-btn { background: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+    .edit-btn { background: #ffc107; color: black; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-right: 5px; text-decoration: none; font-size: 12px; font-weight: bold; }
     .notif-btn { background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-right: 5px; }
 
     @media (max-width: 600px) {
@@ -455,6 +456,7 @@ def get_site_settings():
                 "lock_duration": 30, "file_channel": "",
                 "auto_delete_time": 5, "protect_content": "No",
                 "notification_channel": "",
+                "popunder_code": "", # New Popunder field
                 "notif_main": "t.me/drama4uofficial",
                 "notif_chat": "t.me/drama2hchat",
                 "notif_fb": "facebook.com/bddranaworld",
@@ -489,8 +491,11 @@ def render_full_page(body_html, **kwargs):
         <meta charset="UTF-8">
         <title>{{ settings.site_name }}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- DNS Bypass / Preconnect -->
         <link rel="preconnect" href="//libtl.com">
         <link rel="dns-prefetch" href="//libtl.com">
+        <link rel="dns-prefetch" href="//hilltopads.net">
+        <link rel="dns-prefetch" href="//adsterra.com">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         """ + FULL_CSS + """
     </head>
@@ -545,6 +550,10 @@ def render_full_page(body_html, **kwargs):
             
     template_end = """
         </div>
+        <!-- Popunder Ad Section -->
+        {% if settings.popunder_code %}
+            {{ settings.popunder_code | safe }}
+        {% endif %}
     </body>
     </html>
     """
@@ -953,6 +962,40 @@ def movie_detail(m_id):
     """
     return render_full_page(content, movie=movie, is_premium=is_premium)
 
+# --- New Route to Edit Movie ---
+@app.route('/admin/edit-movie/<m_id>', methods=['GET', 'POST'])
+def edit_movie(m_id):
+    if session.get('role') != 'admin': return redirect('/')
+    movie = mongo.db.movies.find_one({"_id": ObjectId(m_id)})
+    if not movie: return redirect('/admin')
+    
+    if request.method == 'POST':
+        new_title = request.form.get('title')
+        new_poster = request.form.get('poster')
+        new_poster_fid = request.form.get('poster_file_id')
+        
+        mongo.db.movies.update_one({"_id": ObjectId(m_id)}, {"$set": {
+            "title": new_title,
+            "poster": new_poster,
+            "poster_file_id": new_poster_fid
+        }})
+        flash("Movie details updated successfully!")
+        return redirect('/admin')
+    
+    html = f"""
+    <div class="card">
+        <h3>Edit Movie: {movie['title']}</h3>
+        <form method="POST">
+            Movie Name: <input name="title" value="{movie['title']}" required>
+            Poster URL: <input name="poster" value="{movie['poster']}" required>
+            Poster File ID: <input name="poster_file_id" value="{movie.get('poster_file_id', '')}">
+            <button class="btn" type="submit">Update Movie</button>
+        </form>
+        <a href="/admin" style="display:block; text-align:center; margin-top:15px; color:var(--gray);">Back to Admin</a>
+    </div>
+    """
+    return render_full_page(html)
+
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if session.get('role') != 'admin': 
@@ -1012,7 +1055,6 @@ def admin():
                 "protect_content": request.form.get('protect_content')
             }}, upsert=True)
             flash("Ad and storage settings updated!")
-        # --- NEW NOTIFICATION LINKS SAVE LOGIC ---
         elif action == 'update_notif_links':
             mongo.db.settings.update_one({"type": "config"}, {"$set": {
                 "notification_channel": request.form.get('notification_channel'),
@@ -1022,6 +1064,12 @@ def admin():
                 "notif_footer": request.form.get('notif_footer')
             }}, upsert=True)
             flash("Notification Section updated!")
+        # --- NEW Action for Popunder Adsterra ---
+        elif action == 'update_popunder':
+            mongo.db.settings.update_one({"type": "config"}, {"$set": {
+                "popunder_code": request.form.get('popunder_code')
+            }}, upsert=True)
+            flash("Popunder Add settings updated!")
         elif action == 'delete_movie':
             mid = request.form.get('movie_id')
             mongo.db.movies.delete_one({"_id": ObjectId(mid)})
@@ -1051,7 +1099,18 @@ def admin():
         </form>
     </div>
 
-    <!-- --- NOTIFICATION SECTION (TELEGRAM CHANNEL ID ADDED) --- -->
+    <!-- Popunder Ad Menu (NEW) -->
+    <div class="card" style="border-top:4px solid #ff00ff;">
+        <h3><i class="fas fa-bullhorn"></i> Popunder Ad (Adsterra)</h3>
+        <form method="POST">
+            <input type="hidden" name="action" value="update_popunder">
+            Paste Popunder Script Here:
+            <textarea name="popunder_code" style="width:100%; height:100px; background:#1a1a1a; color:white; padding:10px; border-radius:10px; border:1px solid #333;">{{ settings.popunder_code }}</textarea>
+            <p style="color:var(--gray); font-size:11px;">To delete, clear the box and save.</p>
+            <button class="btn" type="submit" style="background:#ff00ff;">Save Popunder Code</button>
+        </form>
+    </div>
+
     <div class="card" style="border-top:4px solid #FFA500;">
         <h3><i class="fas fa-bell"></i> Telegram Notification Settings</h3>
         <p style="color:var(--gray); font-size:12px; margin-bottom:10px;">Configure where and how notifications are sent.</p>
@@ -1158,6 +1217,7 @@ def admin():
             <div class="manage-item">
                 <span>{{ m.title }}</span>
                 <div style="display:flex;">
+                    <a href="/admin/edit-movie/{{ m._id }}" class="edit-btn">Edit</a>
                     <form method="POST" style="margin:0;">
                         <input type="hidden" name="action" value="push_notification">
                         <input type="hidden" name="movie_id" value="{{ m._id }}">
