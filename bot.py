@@ -21,7 +21,7 @@ BASE_URL = "https://kdramawatch.vercel.app"
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
 
-# এখানে আপনি কমা দিয়ে যত খুশি এডমিন আইডি বসাতে পারবেন (আনলিমিটেড)
+# এখানে আনলিমিটেড এডমিন আইডি বসানো যায় (কমা দিয়ে দিয়ে আইডি দিন)
 ADMIN_IDS = [2130296341, 7120801813] 
 
 app = Flask(__name__)
@@ -1454,13 +1454,13 @@ def handle_bot_inputs(m):
             try:
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
                 
-                # --- অটোমেটিক থাম্বনেল এড করার লজিক (নিশ্চিত উপায়) ---
-                # পোস্টারটি সাময়িকভাবে ডাউনলোড করা হচ্ছে থাম্বনেল হিসেবে ব্যবহার করার জন্য
+                # --- অটোমেটিক থাম্বনেল এড করার লজিক (Write-Only Error Fix) ---
+                # পোস্টারটি /tmp/ ফোল্ডারে ডাউনলোড করা হচ্ছে যা Vercel-এ অ্যালাউড
                 thumb_file_id = state.get('poster_file_id')
                 file_info = bot.get_file(thumb_file_id)
                 downloaded_thumb = bot.download_file(file_info.file_path)
                 
-                temp_thumb_name = f"thumb_{cid}.jpg"
+                temp_thumb_name = f"/tmp/thumb_{cid}.jpg" # এখানে /tmp/ ব্যবহার করা হয়েছে
                 with open(temp_thumb_name, 'wb') as f:
                     f.write(downloaded_thumb)
                 
@@ -1472,7 +1472,10 @@ def handle_bot_inputs(m):
                         sent = bot.send_document(storage_ch, m.document.file_id, thumb=thumb_file)
                 
                 # সাময়িক ফাইল ডিলিট
-                os.remove(temp_thumb_name)
+                try:
+                    os.remove(temp_thumb_name)
+                except:
+                    pass
                 
                 user_states[cid]['episodes'].append(sent.message_id)
                 bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added with Thumbnail.")
