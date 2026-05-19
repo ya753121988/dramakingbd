@@ -21,8 +21,8 @@ BASE_URL = "https://kdramawatch.vercel.app"
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
 
-# এখানে আনলিমিটেড এডমিন আইডি বসাতে পারবেন
-ADMIN_IDS = [2130296341,7120801813] # আপনার আইডি এবং অন্যান্য এডমিন আইডি এখানে কমা দিয়ে বসান
+# এখানে আপনি কমা দিয়ে যত খুশি এডমিন আইডি বসাতে পারবেন (আনলিমিটেড)
+ADMIN_IDS = [2130296341, 7120801813] 
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
@@ -1053,7 +1053,7 @@ def admin():
                 "ad_limit": int(request.form.get('ad_limit')),
                 "lock_duration": int(request.form.get('lock_duration')),
                 "file_channel": request.form.get('file_channel'),
-                "auto_delete_time": int(settings.get('auto_delete_time', 5)),
+                "auto_delete_time": int(request.form.get('auto_delete_time', 5)),
                 "protect_content": request.form.get('protect_content')
             }}, upsert=True)
             flash("Ad and storage settings updated!")
@@ -1377,8 +1377,9 @@ def handle_bot_start(m):
 
 @bot.message_handler(commands=['movie'])
 def start_adding_movie(m):
+    # আনলিমিটেড এডমিন আইডি চেক
     if m.from_user.id not in ADMIN_IDS:
-        bot.send_message(m.chat.id, f"❌ You are not the admin!")
+        bot.send_message(m.chat.id, f"❌ You are not an authorized admin!")
         return
     try:
         parts = m.text.split('/movie ')[1].split(',')
@@ -1400,6 +1401,7 @@ def start_adding_movie(m):
 def handle_bot_inputs(m):
     cid = m.chat.id
     if cid not in user_states: return
+    # আনলিমিটেড এডমিন আইডি চেক
     if m.from_user.id not in ADMIN_IDS: return 
     
     state = user_states[cid]
@@ -1452,13 +1454,25 @@ def handle_bot_inputs(m):
             try:
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
                 
-                # মুভির পোস্টার থাম্বনেইল হিসেবে সেট করা হচ্ছে
-                poster_thumb = state.get('poster_file_id')
-
-                if m.content_type == 'video':
-                    sent = bot.send_video(storage_ch, m.video.file_id, thumb=poster_thumb)
-                else:
-                    sent = bot.send_document(storage_ch, m.document.file_id, thumb=poster_thumb)
+                # --- অটোমেটিক থাম্বনেল এড করার লজিক (নিশ্চিত উপায়) ---
+                # পোস্টারটি সাময়িকভাবে ডাউনলোড করা হচ্ছে থাম্বনেল হিসেবে ব্যবহার করার জন্য
+                thumb_file_id = state.get('poster_file_id')
+                file_info = bot.get_file(thumb_file_id)
+                downloaded_thumb = bot.download_file(file_info.file_path)
+                
+                temp_thumb_name = f"thumb_{cid}.jpg"
+                with open(temp_thumb_name, 'wb') as f:
+                    f.write(downloaded_thumb)
+                
+                # নতুন থাম্বনেল সহ ভিডিওটি স্টোরেজ চ্যানেলে পাঠানো হচ্ছে
+                with open(temp_thumb_name, 'rb') as thumb_file:
+                    if m.content_type == 'video':
+                        sent = bot.send_video(storage_ch, m.video.file_id, thumb=thumb_file)
+                    else:
+                        sent = bot.send_document(storage_ch, m.document.file_id, thumb=thumb_file)
+                
+                # সাময়িক ফাইল ডিলিট
+                os.remove(temp_thumb_name)
                 
                 user_states[cid]['episodes'].append(sent.message_id)
                 bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added with Thumbnail.")
