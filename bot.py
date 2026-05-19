@@ -20,7 +20,9 @@ BASE_URL = "https://kdramawatch.vercel.app"
 # --- New added Security and API Info ---
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
-OWNER_ID = 2130296341 # Your telegram ID here (Only you can add movies)
+
+# এখানে আনলিমিটেড এডমিন আইডি বসাতে পারবেন
+ADMIN_IDS = [2130296341,7120801813] # আপনার আইডি এবং অন্যান্য এডমিন আইডি এখানে কমা দিয়ে বসান
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
@@ -1051,7 +1053,7 @@ def admin():
                 "ad_limit": int(request.form.get('ad_limit')),
                 "lock_duration": int(request.form.get('lock_duration')),
                 "file_channel": request.form.get('file_channel'),
-                "auto_delete_time": int(request.form.get('auto_delete_time', 5)),
+                "auto_delete_time": int(settings.get('auto_delete_time', 5)),
                 "protect_content": request.form.get('protect_content')
             }}, upsert=True)
             flash("Ad and storage settings updated!")
@@ -1375,8 +1377,8 @@ def handle_bot_start(m):
 
 @bot.message_handler(commands=['movie'])
 def start_adding_movie(m):
-    if int(m.from_user.id) != int(OWNER_ID):
-        bot.send_message(m.chat.id, f"❌ You are not the owner!")
+    if m.from_user.id not in ADMIN_IDS:
+        bot.send_message(m.chat.id, f"❌ You are not the admin!")
         return
     try:
         parts = m.text.split('/movie ')[1].split(',')
@@ -1398,7 +1400,7 @@ def start_adding_movie(m):
 def handle_bot_inputs(m):
     cid = m.chat.id
     if cid not in user_states: return
-    if int(m.from_user.id) != int(OWNER_ID): return 
+    if m.from_user.id not in ADMIN_IDS: return 
     
     state = user_states[cid]
     settings = get_site_settings()
@@ -1449,13 +1451,17 @@ def handle_bot_inputs(m):
                 return
             try:
                 storage_ch = int(channel_id) if str(channel_id).startswith('-') else channel_id
+                
+                # মুভির পোস্টার থাম্বনেইল হিসেবে সেট করা হচ্ছে
+                poster_thumb = state.get('poster_file_id')
+
                 if m.content_type == 'video':
-                    sent = bot.send_video(storage_ch, m.video.file_id)
+                    sent = bot.send_video(storage_ch, m.video.file_id, thumb=poster_thumb)
                 else:
-                    sent = bot.send_document(storage_ch, m.document.file_id)
+                    sent = bot.send_document(storage_ch, m.document.file_id, thumb=poster_thumb)
                 
                 user_states[cid]['episodes'].append(sent.message_id)
-                bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added.")
+                bot.send_message(cid, f"✅ Episode {len(user_states[cid]['episodes'])} added with Thumbnail.")
             except Exception as e:
                 bot.send_message(cid, f"❌ Error: {str(e)}")
 
